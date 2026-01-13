@@ -241,7 +241,6 @@ exports.shareDocument = async (req, res) => {
     const existingCollaborator = document.collaborators.find(c => c.userId === sharedUserId);
     if (existingCollaborator) {
       existingCollaborator.permission = permission;
-      existingCollaborator.username = sharedUsername;
     } else {
       document.collaborators.push({
         userId: sharedUserId,
@@ -294,17 +293,36 @@ exports.exportToPDF = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // TODO: Call FaaS function for PDF generation
-    // For now, return a mock response
-    res.json({
-      message: 'PDF export initiated',
-      documentId,
-      status: 'processing',
-      note: 'FaaS integration will be implemented next'
+    console.log(`Calling FaaS to generate PDF for document: ${documentId}`);
+
+    // Call FaaS function for PDF generation
+    const faasUrl = process.env.FAAS_URL || 'http://pdf-export-function:8080';
+    const response = await axios.post(`${faasUrl}/function/pdf-export`, {
+      title: document.title,
+      content: document.content,
+      metadata: {
+        author: document.ownerUsername,
+        createdAt: document.createdAt,
+        version: document.version
+      }
+    }, {
+      responseType: 'arraybuffer',
+      timeout: 30000
     });
+
+    // Set headers and send PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${document.title.replace(/[^a-z0-9]/gi, '_')}.pdf"`);
+    res.send(response.data);
+
+    console.log(`PDF generated successfully for document: ${documentId}`);
   } catch (error) {
     console.error('Export PDF error:', error);
-    res.status(500).json({ error: 'Failed to export document' });
+    if (error.response) {
+      res.status(error.response.status).json({ error: 'FaaS function error', details: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to export document', details: error.message });
+    }
   }
 };
 

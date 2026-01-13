@@ -1,0 +1,21 @@
+{
+  "name": "pdf-export-function",
+  "version": "1.0.0",
+  "description": "FaaS function for PDF export",
+  "main": "handler.js",
+  "scripts": {
+    "start": "node handler.js",
+    "dev": "nodemon handler.js"
+  },
+  "keywords": ["faas", "pdf", "serverless"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "pdfkit": "^0.13.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

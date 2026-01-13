@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL for Auth Service
   postgres-auth:
@@ -149,6 +147,7 @@ services:
       PORT: 3002
       MONGO_URI: mongodb://admin:admin123@mongodb:27017/documents?authSource=admin
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      FAAS_URL: http://pdf-export-function:8080
       KAFKA_BROKER: kafka:29092
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
     ports:
@@ -221,6 +220,19 @@ services:
   #     - collab-network
   #   restart: unless-stopped
 
+# FaaS - PDF Export Function
+  pdf-export-function:
+    build: ./faas/pdf-export
+    container_name: pdf-export-function
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    networks:
+      - collab-network
+    restart: unless-stopped
+    
 volumes:
   postgres-auth-data:
   postgres-notification-data:
