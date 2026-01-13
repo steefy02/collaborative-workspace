@@ -1,0 +1,234 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for Auth Service
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: postgres-auth
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    networks:
+      - collab-network
+
+  # MongoDB for Document Service
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - collab-network
+
+  # PostgreSQL for Notification Service
+  postgres-notification:
+    image: postgres:15-alpine
+    container_name: postgres-notification
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-notification-data:/var/lib/postgresql/data
+    networks:
+      - collab-network
+
+  # Redis for real-time state and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - collab-network
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - collab-network
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - collab-network
+
+  # Kafka Event Streaming
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - collab-network
+
+  # Nginx Load Balancer (will be configured later)
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-lb
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - auth-service
+      - document-service
+      - collaboration-service
+      - notification-service
+    networks:
+      - collab-network
+
+  # Auth Service
+  auth-service:
+    build: ./services/auth-service
+    container_name: auth-service
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DB_HOST: postgres-auth
+      DB_PORT: 5432
+      DB_NAME: auth_db
+      DB_USER: admin
+      DB_PASSWORD: admin123
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres-auth
+    networks:
+      - collab-network
+    restart: unless-stopped
+
+  # Document Service
+  document-service:
+    build: ./services/document-service
+    container_name: document-service
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      MONGO_URI: mongodb://admin:admin123@mongodb:27017/documents?authSource=admin
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      KAFKA_BROKER: kafka:29092
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+    ports:
+      - "3002:3002"
+    depends_on:
+      - mongodb
+      - rabbitmq
+      - kafka
+    networks:
+      - collab-network
+    restart: unless-stopped
+
+  # Collaboration Service
+  collaboration-service:
+    build: ./services/collaboration-service
+    container_name: collaboration-service
+    environment:
+      NODE_ENV: development
+      PORT: 3003
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MONGO_URI: mongodb://admin:admin123@mongodb:27017/documents?authSource=admin
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+    ports:
+      - "3003:3003"
+    depends_on:
+      - redis
+      - mongodb
+    networks:
+      - collab-network
+    restart: unless-stopped
+
+  # Notification Service
+  notification-service:
+    build: ./services/notification-service
+    container_name: notification-service
+    environment:
+      NODE_ENV: development
+      PORT: 3004
+      DB_HOST: postgres-notification
+      DB_PORT: 5432
+      DB_NAME: notification_db
+      DB_USER: admin
+      DB_PASSWORD: admin123
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      KAFKA_BROKER: kafka:29092
+    ports:
+      - "3004:3004"
+    depends_on:
+      - postgres-notification
+      - rabbitmq
+      - kafka
+    networks:
+      - collab-network
+    restart: unless-stopped
+
+  # Web Application
+  web-app:
+    build: ./web-app
+    container_name: web-app
+    environment:
+      NODE_ENV: development
+      REACT_APP_API_URL: http://localhost:80
+      REACT_APP_WS_URL: ws://localhost:80
+    ports:
+      - "3000:3000"
+    depends_on:
+      - nginx
+    networks:
+      - collab-network
+    restart: unless-stopped
+
+volumes:
+  postgres-auth-data:
+  postgres-notification-data:
+  mongodb-data:
+  redis-data:
+  rabbitmq-data:
+  kafka-data:
+
+networks:
+  collab-network:
+    driver: bridge
