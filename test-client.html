@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaboration Test Client</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 { color: #333; margin-top: 0; }
+        h2 { color: #666; font-size: 18px; margin-top: 0; }
+        input, textarea, button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background: #45a049; }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .disconnect-btn {
+            background: #f44336;
+        }
+        .disconnect-btn:hover {
+            background: #da190b;
+        }
+        textarea {
+            min-height: 150px;
+            font-family: monospace;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .log {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007bff;
+            background: white;
+        }
+        .users-list {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .user-badge {
+            background: #007bff;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+        .cursor-indicator {
+            background: #ff9800;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin: 2px;
+            display: inline-block;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Real-Time Collaboration Test Client</h1>
+    
+    <div class="container">
+        <h2>1. Authentication</h2>
+        <input type="text" id="token" placeholder="Paste your JWT token here (from login)" />
+        <button onclick="connect()">Connect to Collaboration Service</button>
+        <div id="connectionStatus" class="status disconnected">Disconnected</div>
+    </div>
+
+    <div class="container">
+        <h2>2. Join Document</h2>
+        <input type="text" id="documentId" placeholder="Enter Document ID (MongoDB ObjectId)" />
+        <button onclick="joinDocument()" id="joinBtn" disabled>Join Document</button>
+        <div id="activeUsers">
+            <strong>Active Users:</strong>
+            <div class="users-list" id="usersList"></div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="container">
+            <h2>3. Edit Document</h2>
+            <textarea id="documentContent" placeholder="Document content will appear here..."></textarea>
+            <button onclick="saveDocument()" id="saveBtn" disabled>Save Changes</button>
+            <div>
+                <strong>Cursor Positions:</strong>
+                <div id="cursors"></div>
+            </div>
+        </div>
+
+        <div class="container">
+            <h2>Activity Log</h2>
+            <div class="log" id="log"></div>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let currentDocumentId = null;
+
+        function log(message, data = null) {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            if (data) {
+                entry.innerHTML += `<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            logDiv.insertBefore(entry, logDiv.firstChild);
+        }
+
+        function connect() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                alert('Please enter a JWT token');
+                return;
+            }
+
+            socket = io('http://localhost', {
+                auth: { token }
+            });
+
+            socket.on('connect', () => {
+                log('✅ Connected to Collaboration Service', { socketId: socket.id });
+                document.getElementById('connectionStatus').className = 'status connected';
+                document.getElementById('connectionStatus').textContent = 'Connected (Socket ID: ' + socket.id + ')';
+                document.getElementById('joinBtn').disabled = false;
+            });
+
+            socket.on('disconnect', () => {
+                log('❌ Disconnected from server');
+                document.getElementById('connectionStatus').className = 'status disconnected';
+                document.getElementById('connectionStatus').textContent = 'Disconnected';
+                document.getElementById('joinBtn').disabled = true;
+                document.getElementById('saveBtn').disabled = true;
+            });
+
+            socket.on('error', (data) => {
+                log('⚠️ Error received', data);
+                alert('Error: ' + data.message);
+            });
+
+            socket.on('document:content', (data) => {
+                log('📄 Document content received', data);
+                document.getElementById('documentContent').value = data.content;
+                document.getElementById('saveBtn').disabled = false;
+            });
+
+            socket.on('document:update', (data) => {
+                log('✏️ Document updated by ' + data.username, data);
+                document.getElementById('documentContent').value = data.content;
+            });
+
+            socket.on('user:presence', (data) => {
+                log('👤 User presence update', data);
+                updateUsersList(data.activeUsers);
+            });
+
+            socket.on('cursor:move', (data) => {
+                log('🖱️ Cursor moved: ' + data.username, { position: data.position });
+                updateCursors(data);
+            });
+
+            socket.on('user:typing', (data) => {
+                log('⌨️ ' + data.username + ' is typing...');
+            });
+        }
+
+        function joinDocument() {
+            const documentId = document.getElementById('documentId').value.trim();
+            if (!documentId) {
+                alert('Please enter a document ID');
+                return;
+            }
+
+            currentDocumentId = documentId;
+            socket.emit('document:join', { documentId });
+            log('📥 Joining document: ' + documentId);
+        }
+
+        function saveDocument() {
+            const content = document.getElementById('documentContent').value;
+            socket.emit('document:edit', {
+                documentId: currentDocumentId,
+                content: content,
+                cursorPosition: 0
+            });
+            log('💾 Saving document...');
+        }
+
+        function updateUsersList(userIds) {
+            const usersList = document.getElementById('usersList');
+            usersList.innerHTML = '';
+            userIds.forEach(userId => {
+                const badge = document.createElement('div');
+                badge.className = 'user-badge';
+                badge.textContent = 'User ' + userId;
+                usersList.appendChild(badge);
+            });
+        }
+
+        function updateCursors(data) {
+            const cursorsDiv = document.getElementById('cursors');
+            const cursorId = 'cursor-' + data.userId;
+            let cursor = document.getElementById(cursorId);
+            
+            if (!cursor) {
+                cursor = document.createElement('span');
+                cursor.id = cursorId;
+                cursor.className = 'cursor-indicator';
+                cursorsDiv.appendChild(cursor);
+            }
+            
+            cursor.textContent = data.username + ' at pos ' + data.position;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Simulate cursor movement
+        document.getElementById('documentContent')?.addEventListener('click', function(e) {
+            if (socket && currentDocumentId) {
+                const position = this.selectionStart;
+                socket.emit('cursor:position', {
+                    documentId: currentDocumentId,
+                    position: position
+                });
+            }
+        });
+
+        // Simulate typing indicator
+        let typingTimeout;
+        document.getElementById('documentContent')?.addEventListener('input', function() {
+            if (socket && currentDocumentId) {
+                socket.emit('user:typing', {
+                    documentId: currentDocumentId,
+                    isTyping: true
+                });
+                
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    socket.emit('user:typing', {
+                        documentId: currentDocumentId,
+                        isTyping: false
+                    });
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>

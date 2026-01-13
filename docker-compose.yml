@@ -205,21 +205,21 @@ services:
       - collab-network
     restart: unless-stopped
 
-  # Web Application
-  web-app:
-    build: ./web-app
-    container_name: web-app
-    environment:
-      NODE_ENV: development
-      REACT_APP_API_URL: http://localhost:80
-      REACT_APP_WS_URL: ws://localhost:80
-    ports:
-      - "3000:3000"
-    depends_on:
-      - nginx
-    networks:
-      - collab-network
-    restart: unless-stopped
+  # Web Application (will be created later)
+  # web-app:
+  #   build: ./web-app
+  #   container_name: web-app
+  #   environment:
+  #     NODE_ENV: development
+  #     REACT_APP_API_URL: http://localhost:80
+  #     REACT_APP_WS_URL: ws://localhost:80
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - nginx
+  #   networks:
+  #     - collab-network
+  #   restart: unless-stopped
 
 volumes:
   postgres-auth-data:
