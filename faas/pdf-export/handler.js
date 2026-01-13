@@ -72,9 +72,6 @@ app.post('/function/pdf-export', async (req, res) => {
       if (metadata.createdAt) {
         doc.text(`Created: ${new Date(metadata.createdAt).toLocaleDateString()}`);
       }
-      if (metadata.version) {
-        doc.text(`Version: ${metadata.version}`);
-      }
       
       doc.moveDown(1);
     }
