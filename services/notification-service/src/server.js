@@ -57,7 +57,7 @@ async function startServer() {
     await startKafkaConsumer();
     console.log('Kafka consumer started');
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Notification Service running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV}`);
     });

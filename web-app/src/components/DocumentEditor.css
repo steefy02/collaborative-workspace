@@ -1,0 +1,67 @@
+.document-editor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 15px;
+  background: white;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 15px;
+}
+
+.editor-header h2 {
+  flex: 1;
+  margin: 0;
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.save-status {
+  font-size: 14px;
+  color: #666;
+}
+
+.save-status.saving {
+  color: #ff9800;
+}
+
+.save-status.saved {
+  color: #4CAF50;
+}
+
+.active-users {
+  padding: 10px 15px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-badge {
+  background: #667eea;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.editor-textarea {
+  flex: 1;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: none;
+}

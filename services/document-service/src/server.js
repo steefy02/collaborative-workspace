@@ -61,7 +61,7 @@ async function startServer() {
     await initializeKafka();
     console.log('Kafka initialized');
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Document Service running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV}`);
     });

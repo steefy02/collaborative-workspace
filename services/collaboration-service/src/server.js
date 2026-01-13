@@ -85,7 +85,7 @@ async function startServer() {
     collaborationHandler = new CollaborationHandler(io, getRedisClient());
 
     const PORT = process.env.PORT || 3003;
-    server.listen(PORT, () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`Collaboration Service running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV}`);
     });

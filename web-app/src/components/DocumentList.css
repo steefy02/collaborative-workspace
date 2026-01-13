@@ -1,0 +1,83 @@
+.document-list {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.list-header h2 {
+  margin: 0;
+}
+
+.create-form {
+  margin-bottom: 20px;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.documents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.document-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.document-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.document-card h3 {
+  margin: 0 0 10px 0;
+  cursor: pointer;
+  color: #2c3e50;
+}
+
+.document-card h3:hover {
+  color: #667eea;
+}
+
+.doc-meta {
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 15px;
+}
+
+.doc-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.doc-actions button {
+  flex: 1;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.empty-state {
+  text-align: center;
+  color: #999;
+  padding: 40px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}

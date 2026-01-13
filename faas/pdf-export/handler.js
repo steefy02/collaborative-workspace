@@ -152,7 +152,7 @@ app.use((req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`PDF Export Function (FaaS) running on port ${PORT}`);
   console.log(`Ready to handle requests at POST /function/pdf-export`);
 });

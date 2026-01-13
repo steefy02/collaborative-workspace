@@ -42,7 +42,7 @@ async function startServer() {
     await initializeDatabase();
     console.log('Database initialized successfully');
     
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Auth Service running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV}`);
     });
