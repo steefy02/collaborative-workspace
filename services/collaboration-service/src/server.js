@@ -11,7 +11,7 @@ const CollaborationHandler = require('./handlers/collaborationHandler');
 const app = express();
 const server = http.createServer(app);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'my-super-secret-jwt-key';
 
 // CORS configuration
 app.use(cors());

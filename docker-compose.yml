@@ -129,7 +129,7 @@ services:
       DB_NAME: auth_db
       DB_USER: admin
       DB_PASSWORD: admin123
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_SECRET: my-super-secret-jwt-key
     ports:
       - "3001:3001"
     depends_on:
@@ -149,7 +149,7 @@ services:
       RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
       FAAS_URL: http://pdf-export-function:8080
       KAFKA_BROKER: kafka:29092
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_SECRET: my-super-secret-jwt-key
     ports:
       - "3002:3002"
     depends_on:
@@ -170,7 +170,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       MONGO_URI: mongodb://admin:admin123@mongodb:27017/documents?authSource=admin
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_SECRET: my-super-secret-jwt-key
     ports:
       - "3003:3003"
     depends_on:
