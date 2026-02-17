@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import './Login.css';
+import './LoginForm.css';
 
-function Login({ onLogin }) {
+function LoginForm({ onLogin, apiBaseUrl }) {
   const [isRegister, setIsRegister] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -12,6 +12,10 @@ function Login({ onLogin }) {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const api = axios.create({
+    baseURL: apiBaseUrl || '',
+  });
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -24,12 +28,15 @@ function Login({ onLogin }) {
 
     try {
       const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
-      const payload = isRegister 
+      const payload = isRegister
         ? { email: formData.email, password: formData.password, username: formData.username, fullName: formData.fullName }
         : { email: formData.email, password: formData.password };
 
-      const response = await axios.post(endpoint, payload);
-      onLogin(response.data.token);
+      const response = await api.post(endpoint, payload);
+
+      if (onLogin) {
+        onLogin(response.data.token);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Authentication failed');
     } finally {
@@ -65,7 +72,7 @@ function Login({ onLogin }) {
               />
             </>
           )}
-          
+
           <input
             type="email"
             name="email"
@@ -74,7 +81,7 @@ function Login({ onLogin }) {
             onChange={handleChange}
             required
           />
-          
+
           <input
             type="password"
             name="password"
@@ -91,8 +98,8 @@ function Login({ onLogin }) {
 
         <p className="toggle-text">
           {isRegister ? 'Already have an account?' : "Don't have an account?"}
-          <button 
-            onClick={() => setIsRegister(!isRegister)} 
+          <button
+            onClick={() => setIsRegister(!isRegister)}
             className="link-button"
           >
             {isRegister ? 'Login' : 'Register'}
@@ -103,4 +110,4 @@ function Login({ onLogin }) {
   );
 }
 
-export default Login;
+export default LoginForm;

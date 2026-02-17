@@ -62,3 +62,10 @@
   border-left: 1px solid #ddd;
   overflow-y: auto;
 }
+
+.mfe-error {
+  text-align: center;
+  color: #f44336;
+  padding: 20px;
+  font-size: 13px;
+}

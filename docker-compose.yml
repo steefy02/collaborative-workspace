@@ -204,7 +204,27 @@ services:
       - collab-network
     restart: unless-stopped
 
-  #Web Application
+  # Notifications Microfrontend (independently built & deployed)
+  notifications-mfe:
+    build: ./microfrontends/notifications
+    container_name: notifications-mfe
+    ports:
+      - "3010:80"
+    networks:
+      - collab-network
+    restart: unless-stopped
+
+  # Auth Microfrontend (independently built & deployed)
+  auth-mfe:
+    build: ./microfrontends/auth
+    container_name: auth-mfe
+    ports:
+      - "3011:80"
+    networks:
+      - collab-network
+    restart: unless-stopped
+
+  #Web Application (Shell / Host)
   web-app:
     build: ./web-app
     container_name: web-app
@@ -216,6 +236,8 @@ services:
       - "3000:80"
     depends_on:
       - nginx
+      - notifications-mfe
+      - auth-mfe
     networks:
       - collab-network
     restart: unless-stopped

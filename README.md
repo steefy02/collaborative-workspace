@@ -65,8 +65,9 @@ The system follows a **microservices architecture** with the following key compo
 - **FaaS Function** - PDF export serverless function
 
 ### **Frontend**
-- **React Web App** with microfrontend architecture
-- Deployed as containerized application
+- **React Web App** with microfrontend architecture (Webpack Module Federation)
+- Shell app + 2 independently deployed microfrontends (Auth & Notifications)
+- Deployed as separate containerized applications
 
 ---
 
@@ -453,73 +454,138 @@ const handleContentChange = (newContent) => {
 ### 7. Microfrontend Architecture
 
 **Implementation:**
-- Application divided into independent, self-contained UI modules
-- Each microfrontend has its own state, API calls, and styling
-- Components can be developed and deployed independently
+- **Webpack Module Federation** used to split the frontend into independently built and deployed modules
+- The application is composed of a **Shell (Host)** app and **2 Microfrontends (Remotes)**:
+  - **Auth MFE** - Login/Register form (port 3011)
+  - **Notifications MFE** - Notifications panel (port 3010)
+- Each microfrontend has its own `package.json`, `webpack.config.js`, `Dockerfile`, and build pipeline
+- Remotes are loaded at runtime via `remoteEntry.js` - no shared build step required
 
 **Evidence:**
+**Remote (auth MFE) webpack.config.js:**
 ```javascript
-// File: web-app/src/App.js
-import DocumentList from './components/DocumentList';
-import DocumentEditor from './components/DocumentEditor';
-import NotificationsWidget from './microfrontends/NotificationsWidget'; // <- Microfrontend
+// File: microfrontends/auth/webpack.config.js
+const { ModuleFederationPlugin } = require('webpack').container;
 
-function App() {
-  return (
-    <div className="app-layout">
-      <main className="main-content">
-        <Routes>
-          <Route path="/documents" element={<DocumentList token={token} />} />
-          <Route path="/documents/:id" element={<DocumentEditor token={token} />} />
-        </Routes>
-      </main>
-      
-      {/* Notifications Microfrontend - completely independent */}
-      <aside className="notifications-sidebar">
-        <NotificationsWidget token={token} />
-      </aside>
-    </div>
-  );
-}
+new ModuleFederationPlugin({
+  name: 'auth_mfe',
+  filename: 'remoteEntry.js',
+  exposes: {
+    './LoginForm': './src/LoginForm',     // Exposed module
+  },
+  shared: {
+    react: { singleton: true, requiredVersion: '^18.2.0', eager: true },
+    'react-dom': { singleton: true, requiredVersion: '^18.2.0', eager: true },
+  },
+})
 ```
 
+**Remote (notifications MFE) webpack.config.js:**
 ```javascript
-// File: web-app/src/microfrontends/NotificationsWidget.js
-// Self-contained microfrontend with own state and API calls
-function NotificationsWidget({ token }) {
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, []);
-  
-  const fetchNotifications = async () => {
-    const response = await axios.get('/api/notifications', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    setNotifications(response.data.notifications);
-  };
-  
-  return (
-    <div className="notifications-widget">
-      {/* Independent UI */}
-    </div>
-  );
-}
+// File: microfrontends/notifications/webpack.config.js
+const { ModuleFederationPlugin } = require('webpack').container;
+
+new ModuleFederationPlugin({
+  name: 'notifications_mfe',
+  filename: 'remoteEntry.js',
+  exposes: {
+    './NotificationsWidget': './src/NotificationsWidget',
+  },
+  shared: {
+    react: { singleton: true, requiredVersion: '^18.2.0', eager: true },
+    'react-dom': { singleton: true, requiredVersion: '^18.2.0', eager: true },
+  },
+})
+```
+
+**Host (shell) webpack.config.js:**
+```javascript
+// File: web-app/webpack.config.js
+const { ModuleFederationPlugin } = require('webpack').container;
+
+new ModuleFederationPlugin({
+  name: 'shell',
+  remotes: {
+    // Both MFEs loaded at runtime from separate containers
+    notifications_mfe: `notifications_mfe@${NOTIFICATIONS_MFE_URL}/remoteEntry.js`,
+    auth_mfe: `auth_mfe@${AUTH_MFE_URL}/remoteEntry.js`,
+  },
+  shared: {
+    react: { singleton: true, requiredVersion: '^18.2.0', eager: true },
+    'react-dom': { singleton: true, requiredVersion: '^18.2.0', eager: true },
+  },
+})
+```
+
+**Dynamic remote loading in App.js:**
+```javascript
+// File: web-app/src/App.js
+
+// Load LoginForm from the remote auth microfrontend
+const RemoteLoginForm = React.lazy(() =>
+  import('auth_mfe/LoginForm').catch(() => ({
+    default: () => <div className="mfe-error">Auth service unavailable</div>,
+  }))
+);
+
+// Load NotificationsWidget from the remote notifications microfrontend
+const RemoteNotificationsWidget = React.lazy(() =>
+  import('notifications_mfe/NotificationsWidget').catch(() => ({
+    default: () => <div className="mfe-error">Notifications service unavailable</div>,
+  }))
+);
+
+// Both wrapped in error boundaries and Suspense for fault isolation
+<MicroFrontendErrorBoundary>
+  <Suspense fallback={<div>Loading...</div>}>
+    <RemoteLoginForm onLogin={handleLogin} />
+  </Suspense>
+</MicroFrontendErrorBoundary>
+
+<MicroFrontendErrorBoundary>
+  <Suspense fallback={<div>Loading microfrontend...</div>}>
+    <RemoteNotificationsWidget token={token} />
+  </Suspense>
+</MicroFrontendErrorBoundary>
 ```
 
 **Microfrontend Characteristics:**
-- **Independent:** NotificationsWidget has its own state, API calls, and lifecycle
-- **Self-contained:** Has dedicated CSS file (NotificationsWidget.css)
-- **Reusable:** Can be embedded anywhere in the application
-- **Technology-agnostic:** Could be rewritten in different framework without affecting main app
-- **Independent deployment:** Changes to notifications don't require rebuilding main app
+- **Independent build:** Each MFE has its own `package.json`, `webpack.config.js`, and `node_modules`
+- **Independent deployment:** Each runs as a separate Docker container (auth-mfe:3011, notifications-mfe:3010)
+- **Runtime integration:** Shell loads `remoteEntry.js` from each remote - no rebuild of shell needed when an MFE changes
+- **Shared dependencies:** React is shared as a singleton to avoid duplicate instances
+- **Fault isolation:** Error boundaries + Suspense fallbacks ensure the shell works even if an MFE is down
+- **Standalone development:** Each MFE can run independently with its own `index.html` and dev server
+- **Technology-agnostic:** Either remote could be rewritten in Vue/Angular and still expose the same module
 
-**Additional Microfrontends:**
-- Login component (`components/Login.js`)
+**Docker Compose - Separate Containers:**
+```yaml
+# Auth Microfrontend (independently built & deployed)
+auth-mfe:
+  build: ./microfrontends/auth
+  container_name: auth-mfe
+  ports:
+    - "3011:80"
+
+# Notifications Microfrontend (independently built & deployed)
+notifications-mfe:
+  build: ./microfrontends/notifications
+  container_name: notifications-mfe
+  ports:
+    - "3010:80"
+
+# Web Application (Shell / Host)
+web-app:
+  build: ./web-app
+  container_name: web-app
+  depends_on:
+    - notifications-mfe
+    - auth-mfe
+  ports:
+    - "3000:80"
+```
+
+**Local Components (remain in shell):**
 - Document List component (`components/DocumentList.js`)
 - Document Editor component (`components/DocumentEditor.js`)
 
@@ -530,7 +596,7 @@ function NotificationsWidget({ token }) {
 **Implementation:**
 - Every service has its own Dockerfile
 - Docker Compose orchestrates all containers
-- Multi-container application with 13 services
+- Multi-container application with 15 services
 
 **Evidence:**
 ```yaml
@@ -635,12 +701,34 @@ services:
       - collab-network
 
   # Frontend
+  # Auth Microfrontend (independently built & deployed)
+  auth-mfe:
+    build: ./microfrontends/auth
+    container_name: auth-mfe
+    ports:
+      - "3011:80"
+    networks:
+      - collab-network
+
+  # Notifications Microfrontend (independently built & deployed)
+  notifications-mfe:
+    build: ./microfrontends/notifications
+    container_name: notifications-mfe
+    ports:
+      - "3010:80"
+    networks:
+      - collab-network
+
+  #Web Application (Shell / Host)
   web-app:
     build: ./web-app
+    container_name: web-app
     ports:
       - "3000:80"
     depends_on:
       - nginx
+      - notifications-mfe
+      - auth-mfe
     networks:
       - collab-network
 
@@ -738,6 +826,7 @@ docker-compose down
 ### **Frontend**
 - **React:** UI framework
 - **React Router:** Client-side routing
+- **Webpack Module Federation:** Microfrontend architecture
 - **Axios:** HTTP client
 - **Socket.IO Client:** WebSocket client
 
@@ -761,7 +850,7 @@ docker-compose down
 ### **Example 2: Creating a Document**
 1. User clicks "New Document" -> Web App
 2. POST `/api/documents` with JWT -> Nginx
-3. Nginx validates and routes to Document Service
+3. Nginx routes the requests to Document Service
 4. Document Service:
    - Validates JWT token
    - Creates document in MongoDB
@@ -826,7 +915,7 @@ docker-compose down
 
 ### **Prerequisites**
 - Docker & Docker Compose installed
-- Ports available: 80, 3000-3004, 5432-5433, 6379, 8080, 9092, 15672, 27017
+- Ports available: 80, 3000-3004, 3010-3011, 5432-5433, 6379, 8080, 9092, 15672, 27017
 
 ### **Steps**
 
@@ -848,6 +937,8 @@ docker-compose up -d
 
 4. **Access the application**
 - **Web App:** http://localhost:3000
+- **Notifications MFE:** http://localhost:3010 (independent microfrontend)
+- **Auth MFE:** http://localhost:3011 (independent microfrontend)
 - **Nginx Load Balancer:** http://localhost:80
 - **RabbitMQ Management:** http://localhost:15672
 - **Auth Service:** http://localhost:3001/health

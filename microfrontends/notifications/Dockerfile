@@ -11,24 +11,18 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the shell app
-# MFE remoteEntry.js files are proxied through the shell's nginx at /mfe/*
-# This way the browser can reach the remotes from the same origin
-ENV NOTIFICATIONS_MFE_URL=/mfe/notifications
-ENV AUTH_MFE_URL=/mfe/auth
+# Build the microfrontend
 RUN npm run build
 
 # Production stage with nginx
 FROM nginx:alpine
 
-# Copy built files to nginx
+# Copy built files (including remoteEntry.js) to nginx
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port
 EXPOSE 80
 
-# Start nginx
 CMD ["nginx", "-g", "daemon off;"]

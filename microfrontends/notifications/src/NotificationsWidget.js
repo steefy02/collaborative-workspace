@@ -2,25 +2,29 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './NotificationsWidget.css';
 
-function NotificationsWidget({ token }) {
+function NotificationsWidget({ token, apiBaseUrl }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const api = axios.create({
+    baseURL: apiBaseUrl || '',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
+    const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [token]);
 
   const fetchNotifications = async () => {
     try {
-      const response = await axios.get('/api/notifications', {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { limit: 10 }
+      const response = await api.get('/api/notifications', {
+        params: { limit: 10 },
       });
       setNotifications(response.data.notifications);
-      setUnreadCount(response.data.notifications.filter(n => !n.is_read).length);
+      setUnreadCount(response.data.notifications.filter((n) => !n.is_read).length);
     } catch (err) {
       console.error('Failed to fetch notifications');
     } finally {
@@ -30,9 +34,7 @@ function NotificationsWidget({ token }) {
 
   const markAsRead = async (id) => {
     try {
-      await axios.put(`/api/notifications/${id}/read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/api/notifications/${id}/read`);
       fetchNotifications();
     } catch (err) {
       console.error('Failed to mark as read');
@@ -41,9 +43,7 @@ function NotificationsWidget({ token }) {
 
   const markAllAsRead = async () => {
     try {
-      await axios.put('/api/notifications/read-all', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put('/api/notifications/read-all');
       fetchNotifications();
     } catch (err) {
       console.error('Failed to mark all as read');
@@ -63,9 +63,7 @@ function NotificationsWidget({ token }) {
     <div className="notifications-widget">
       <div className="widget-header">
         <h3>🔔 Notifications</h3>
-        {unreadCount > 0 && (
-          <span className="unread-badge">{unreadCount}</span>
-        )}
+        {unreadCount > 0 && <span className="unread-badge">{unreadCount}</span>}
       </div>
 
       {unreadCount > 0 && (
@@ -78,9 +76,9 @@ function NotificationsWidget({ token }) {
         {notifications.length === 0 ? (
           <p className="empty-state">No notifications</p>
         ) : (
-          notifications.map(notif => (
-            <div 
-              key={notif.id} 
+          notifications.map((notif) => (
+            <div
+              key={notif.id}
               className={`notification-item ${notif.is_read ? 'read' : 'unread'}`}
               onClick={() => !notif.is_read && markAsRead(notif.id)}
             >
